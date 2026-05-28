@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>简约记账</title>
   <!-- 引入Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -74,6 +74,9 @@
       }
       .text-balance {
         text-wrap: balance;
+      }
+      .safe-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
       }
     }
   </style>
@@ -156,82 +159,88 @@
     <!-- 弹窗遮罩层 -->
     <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300"></div>
 
-    <!-- 记账弹窗 -->
-    <div id="account-modal" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl z-50 hidden overflow-hidden">
-      <!-- 弹窗头部 -->
-      <div class="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700">
-        <h3 class="text-lg font-semibold">记一笔</h3>
-        <button id="close-modal" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <i class="fa fa-times text-gray-500 dark:text-gray-400"></i>
-        </button>
-      </div>
+    <!-- 记账弹窗 - 优化后结构：限制最大高度+固定头部+可滚动内容 -->
+    <div id="account-modal" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl z-50 hidden overflow-hidden max-h-[90vh] flex flex-col">
+      <!-- 固定头部区域（不滚动，始终可见） -->
+      <div class="flex-shrink-0">
+        <!-- 弹窗头部 -->
+        <div class="flex justify-between items-center p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700">
+          <h3 class="text-lg font-semibold">记一笔</h3>
+          <button id="close-modal" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <i class="fa fa-times text-gray-500 dark:text-gray-400"></i>
+          </button>
+        </div>
 
-      <!-- 类型切换 -->
-      <div class="flex p-4 gap-2">
-        <button id="expense-tab" class="flex-1 py-2 rounded-lg text-center font-medium transition-colors bg-expense/10 text-expense">
-          支出
-        </button>
-        <button id="income-tab" class="flex-1 py-2 rounded-lg text-center font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
-          收入
-        </button>
-      </div>
+        <!-- 类型切换 -->
+        <div class="flex p-3 sm:p-4 gap-2">
+          <button id="expense-tab" class="flex-1 py-2 rounded-lg text-center font-medium transition-colors bg-expense/10 text-expense">
+            支出
+          </button>
+          <button id="income-tab" class="flex-1 py-2 rounded-lg text-center font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+            收入
+          </button>
+        </div>
 
-      <!-- 金额输入 -->
-      <div class="p-4 text-center">
-        <input 
-          type="text" 
-          id="amount-input" 
-          class="w-full text-4xl font-bold text-center bg-transparent border-none outline-none text-expense" 
-          value="0.00" 
-          readonly
-        >
-      </div>
-
-      <!-- 数字键盘 -->
-      <div class="grid grid-cols-3 gap-2 p-4 border-t border-gray-100 dark:border-gray-700">
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="1">1</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="2">2</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="3">3</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="4">4</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="5">5</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="6">6</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="7">7</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="8">8</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="9">9</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num=".">.</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="0">0</button>
-        <button class="num-key h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium text-expense hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="del">
-          <i class="fa fa-delete-left"></i>
-        </button>
-      </div>
-
-      <!-- 分类选择 -->
-      <div class="p-4 border-t border-gray-100 dark:border-gray-700">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">选择分类</p>
-        <div id="category-container" class="grid grid-cols-4 gap-3">
-          <!-- 分类会动态生成 -->
+        <!-- 金额输入 -->
+        <div class="p-3 sm:p-4 text-center">
+          <input 
+            type="text" 
+            id="amount-input" 
+            class="w-full text-3xl sm:text-4xl font-bold text-center bg-transparent border-none outline-none text-expense" 
+            value="0.00" 
+            readonly
+          >
         </div>
       </div>
 
-      <!-- 备注输入 -->
-      <div class="p-4 border-t border-gray-100 dark:border-gray-700">
-        <input 
-          type="text" 
-          id="remark-input" 
-          class="w-full p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-colors" 
-          placeholder="添加备注（可选）"
-        >
-      </div>
+      <!-- 可滚动内容区域 -->
+      <div id="modal-content" class="flex-1 overflow-y-auto scrollbar-hide scroll-smooth">
+        <!-- 数字键盘 - 优化小屏高度 -->
+        <div class="grid grid-cols-3 gap-1 sm:gap-2 p-3 sm:p-4 border-t border-gray-100 dark:border-gray-700">
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="1">1</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="2">2</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="3">3</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="4">4</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="5">5</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="6">6</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="7">7</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="8">8</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="9">9</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num=".">.</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="0">0</button>
+          <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium text-expense hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95" data-num="del">
+            <i class="fa fa-backspace"></i>
+          </button>
+        </div>
 
-      <!-- 保存按钮 -->
-      <div class="p-4">
-        <button 
-          id="save-btn" 
-          class="w-full py-4 rounded-xl bg-expense hover:bg-expense/90 text-white font-semibold text-lg transition-colors active:scale-98 disabled:bg-gray-300 disabled:dark:bg-gray-700 disabled:cursor-not-allowed"
-          disabled
-        >
-          保存
-        </button>
+        <!-- 分类选择 -->
+        <div class="p-3 sm:p-4 border-t border-gray-100 dark:border-gray-700">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">选择分类</p>
+          <div id="category-container" class="grid grid-cols-4 gap-3">
+            <!-- 分类会动态生成 -->
+          </div>
+        </div>
+
+        <!-- 备注输入 -->
+        <div class="p-3 sm:p-4 border-t border-gray-100 dark:border-gray-700">
+          <input 
+            type="text" 
+            id="remark-input" 
+            class="w-full p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-colors" 
+            placeholder="添加备注（可选）"
+          >
+        </div>
+
+        <!-- 保存按钮 - 优化底部安全区域 -->
+        <div class="p-3 sm:p-4 pb-6 safe-bottom">
+          <button 
+            id="save-btn" 
+            class="w-full py-3 sm:py-4 rounded-xl bg-expense hover:bg-expense/90 text-white font-semibold text-lg transition-colors active:scale-98 disabled:bg-gray-300 disabled:dark:bg-gray-700 disabled:cursor-not-allowed"
+            disabled
+          >
+            保存
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -240,9 +249,9 @@
   <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg z-50 opacity-0 transition-opacity duration-300 pointer-events-none"></div>
 
   <script>
-    // 分类配置
+    // 分类配置 - 修复Font Awesome 4.7兼容图标
     const expenseCategories = [
-      { name: '餐饮', icon: 'fa-utensils' },
+      { name: '餐饮', icon: 'fa-cutlery' },
       { name: '购物', icon: 'fa-shopping-bag' },
       { name: '交通', icon: 'fa-bus' },
       { name: '娱乐', icon: 'fa-film' },
@@ -252,10 +261,10 @@
     ];
 
     const incomeCategories = [
-      { name: '工资', icon: 'fa-money-bill-wave' },
+      { name: '工资', icon: 'fa-money' },
       { name: '红包', icon: 'fa-gift' },
-      { name: '奖金', icon: 'fa-award' },
-      { name: '投资', icon: 'fa-chart-line' },
+      { name: '奖金', icon: 'fa-trophy' },
+      { name: '投资', icon: 'fa-line-chart' },
       { name: '其他', icon: 'fa-ellipsis-h' },
     ];
 
@@ -281,6 +290,7 @@
     const emptyState = document.getElementById('empty-state');
     const toast = document.getElementById('toast');
     const numKeys = document.querySelectorAll('.num-key');
+    const modalContent = document.getElementById('modal-content');
     
     // 统计元素
     const balanceEl = document.getElementById('balance');
@@ -334,14 +344,14 @@
       localStorage.setItem('accounting_theme', isDark ? 'dark' : 'light');
     }
 
-    // 渲染分类
+    // 渲染分类 - 优化小屏间距
     function renderCategories() {
       const categories = currentType === 'expense' ? expenseCategories : incomeCategories;
       categoryContainer.innerHTML = '';
       
       categories.forEach(category => {
         const button = document.createElement('button');
-        button.className = 'category-btn flex flex-col items-center justify-center py-3 px-2 rounded-lg transition-colors bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95';
+        button.className = 'category-btn flex flex-col items-center justify-center py-2 sm:py-3 px-2 rounded-lg transition-colors bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95';
         button.innerHTML = `
           <i class="fa ${category.icon} text-xl mb-1"></i>
           <span class="text-xs">${category.name}</span>
@@ -466,7 +476,8 @@
       accountModal.classList.remove('animate-slide-down');
       accountModal.classList.add('animate-slide-up');
       document.body.style.overflow = 'hidden';
-      
+      // 每次打开弹窗滚动到顶部
+      modalContent.scrollTop = 0;
       // 重置输入
       resetModal();
     }
@@ -533,7 +544,7 @@
       showToast('保存成功');
     }
 
-    // 删除记录
+    // 删除记录 - 修复图标
     function deleteRecord(id) {
       const recordEl = document.getElementById(`record-${id}`);
       if (recordEl) {
@@ -634,7 +645,7 @@
       monthExpenseEl.textContent = `-${formatAmount(monthExpense)}`;
     }
 
-    // 渲染记录列表
+    // 渲染记录列表 - 修复图标
     function renderRecords() {
       if (records.length === 0) {
         emptyState.classList.remove('hidden');
@@ -674,7 +685,7 @@
           <div class="flex items-center">
             <span class="font-semibold ${amountClass}">${amountSign}${formatAmount(record.amount)}</span>
             <button class="delete-btn ml-4 text-gray-400 hover:text-expense transition-colors" data-id="${record.id}">
-              <i class="fa fa-trash-alt"></i>
+              <i class="fa fa-trash"></i>
             </button>
           </div>
         `;
