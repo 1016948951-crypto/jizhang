@@ -2,7 +2,6 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <!-- 关键修复：完全禁止页面缩放，解决双击放大问题 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>简约记账</title>
   <!-- 引入Tailwind CSS -->
@@ -88,9 +87,7 @@
     /* 全局过渡效果 */
     body {
       transition: background-color 0.3s ease, color 0.3s ease;
-      /* 关键修复：禁止移动端默认触摸行为，消除双击缩放、点击延迟 */
       touch-action: manipulation;
-      /* 禁止点击高亮 */
       -webkit-tap-highlight-color: transparent;
     }
     /* 数字输入框去掉箭头 */
@@ -111,6 +108,12 @@
     input {
       user-select: text;
       -webkit-user-select: text;
+    }
+    /* 隐藏原生month选择器 */
+    #month-picker {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -143,7 +146,8 @@
           </div>
         </div>
         <div>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">本月收支</p>
+          <!-- 动态月份标签 -->
+          <p id="month-label" class="text-sm text-gray-500 dark:text-gray-400 mb-2">本月收支</p>
           <div class="flex justify-between items-center">
             <span id="month-income" class="text-primary-600 dark:text-primary-400 font-medium transition-all duration-300">+0.00</span>
             <span id="month-expense" class="text-expense font-medium transition-all duration-300">-0.00</span>
@@ -154,8 +158,22 @@
 
     <!-- 记录区域 -->
     <div class="mx-4 mb-24">
+      <!-- 新增年月切换区域 -->
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-semibold">最近记录</h2>
+        <div class="flex items-center gap-3">
+          <button id="prev-month" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors no-tap-highlight">
+            <i class="fa fa-chevron-left text-gray-500 dark:text-gray-400"></i>
+          </button>
+          <!-- 点击年月弹出选择器 -->
+          <h2 id="current-month-text" class="text-lg font-semibold cursor-pointer hover:text-primary-500 dark:hover:text-primary-400 transition-colors no-tap-highlight">
+            2024年5月
+          </h2>
+          <button id="next-month" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors no-tap-highlight">
+            <i class="fa fa-chevron-right text-gray-500 dark:text-gray-400"></i>
+          </button>
+          <!-- 隐藏的原生年月选择器 -->
+          <input type="month" id="month-picker" min="2000-01">
+        </div>
       </div>
       
       <!-- 记录列表 -->
@@ -213,7 +231,7 @@
 
       <!-- 可滚动内容区域 -->
       <div id="modal-content" class="flex-1 overflow-y-auto scrollbar-hide scroll-smooth">
-        <!-- 数字键盘 - 修复删除图标 + 优化点击 -->
+        <!-- 数字键盘 -->
         <div class="grid grid-cols-3 gap-1 sm:gap-2 p-3 sm:p-4 border-t border-gray-100 dark:border-gray-700">
           <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 no-tap-highlight" data-num="1">1</button>
           <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 no-tap-highlight" data-num="2">2</button>
@@ -226,7 +244,7 @@
           <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 no-tap-highlight" data-num="9">9</button>
           <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 no-tap-highlight" data-num=".">.</button>
           <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 no-tap-highlight" data-num="0">0</button>
-          <!-- 修复：替换为FA4.7支持的eraser图标（橡皮擦，符合删除输入语义） -->
+          <!-- 删除键图标 -->
           <button class="num-key h-11 sm:h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl font-medium text-expense hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95 no-tap-highlight" data-num="del">
             <i class="fa fa-eraser"></i>
           </button>
@@ -250,7 +268,7 @@
           >
         </div>
 
-        <!-- 保存按钮 - 优化底部安全区域 -->
+        <!-- 保存按钮 -->
         <div class="p-3 sm:p-4 pb-6 safe-bottom">
           <button 
             id="save-btn" 
@@ -292,8 +310,14 @@
     let currentAmount = ''; // 当前输入金额
     let currentCategory = null; // 当前选中分类
     let records = []; // 所有记录
-    // 防止双击的节流变量
-    let lastDelTapTime = 0;
+    let lastDelTapTime = 0; // 防止双击节流
+    // 新增：当前选择的年月，默认是当前系统年月
+    const now = new Date();
+    let currentYear = now.getFullYear();
+    let currentMonth = now.getMonth() + 1; // 月份用1-12表示
+    // 当前系统的最大年月（不可选择未来月份）
+    const maxYear = now.getFullYear();
+    const maxMonth = now.getMonth() + 1;
 
     // DOM 元素
     const themeToggle = document.getElementById('theme-toggle');
@@ -312,6 +336,12 @@
     const toast = document.getElementById('toast');
     const numKeys = document.querySelectorAll('.num-key');
     const modalContent = document.getElementById('modal-content');
+    // 新增：年月切换相关元素
+    const prevMonthBtn = document.getElementById('prev-month');
+    const nextMonthBtn = document.getElementById('next-month');
+    const currentMonthText = document.getElementById('current-month-text');
+    const monthPicker = document.getElementById('month-picker');
+    const monthLabel = document.getElementById('month-label');
     
     // 统计元素
     const balanceEl = document.getElementById('balance');
@@ -326,6 +356,10 @@
       loadRecords();
       // 加载主题设置
       loadTheme();
+      // 初始化年月显示
+      updateMonthDisplay();
+      // 设置月份选择器的最大值为当前年月
+      monthPicker.max = `${maxYear}-${maxMonth.toString().padStart(2, '0')}`;
       // 渲染分类
       renderCategories();
       // 渲染统计数据
@@ -334,6 +368,65 @@
       renderRecords();
       // 绑定事件
       bindEvents();
+    }
+
+    // 新增：更新年月显示
+    function updateMonthDisplay() {
+      // 更新顶部年月文字
+      currentMonthText.textContent = `${currentYear}年${currentMonth}月`;
+      // 更新月份选择器的值
+      monthPicker.value = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+      // 更新统计面板的月份标签，当前月显示"本月收支"，其他月显示对应年月
+      if (currentYear === maxYear && currentMonth === maxMonth) {
+        monthLabel.textContent = '本月收支';
+      } else {
+        monthLabel.textContent = `${currentYear}年${currentMonth}月收支`;
+      }
+      // 禁用下个月按钮（如果已经是当前最大年月）
+      if (currentYear === maxYear && currentMonth === maxMonth) {
+        nextMonthBtn.disabled = true;
+        nextMonthBtn.classList.add('opacity-30', 'cursor-not-allowed');
+      } else {
+        nextMonthBtn.disabled = false;
+        nextMonthBtn.classList.remove('opacity-30', 'cursor-not-allowed');
+      }
+    }
+
+    // 新增：切换到上一个月
+    function prevMonth() {
+      currentMonth--;
+      if (currentMonth < 1) {
+        currentMonth = 12;
+        currentYear--;
+      }
+      updateMonthDisplay();
+      renderStatistics();
+      renderRecords();
+    }
+
+    // 新增：切换到下一个月
+    function nextMonth() {
+      // 不能超过最大年月
+      if (currentYear === maxYear && currentMonth === maxMonth) return;
+      
+      currentMonth++;
+      if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+      }
+      updateMonthDisplay();
+      renderStatistics();
+      renderRecords();
+    }
+
+    // 新增：从选择器切换年月
+    function changeMonthFromPicker() {
+      const [year, month] = monthPicker.value.split('-').map(Number);
+      currentYear = year;
+      currentMonth = month;
+      updateMonthDisplay();
+      renderStatistics();
+      renderRecords();
     }
 
     // 加载本地存储记录
@@ -452,11 +545,11 @@
 
     // 处理数字输入
     function handleNumInput(num) {
-      // 额外修复：删除键双击节流，防止快速点击触发异常
+      // 删除键双击节流
       if (num === 'del') {
-        const now = Date.now();
-        if (now - lastDelTapTime < 150) return; // 150ms内重复点击直接忽略
-        lastDelTapTime = now;
+        const nowTime = Date.now();
+        if (nowTime - lastDelTapTime < 150) return;
+        lastDelTapTime = nowTime;
       }
 
       if (num === 'del') {
@@ -565,7 +658,7 @@
       saveRecords();
       // 关闭弹窗
       closeModal();
-      // 重新渲染
+      // 重新渲染（如果当前选择的是当前月份，会显示新记录）
       renderStatistics();
       renderRecords();
       // 显示提示
@@ -624,39 +717,44 @@
       }
     }
 
-    // 渲染统计数据
+    // 渲染统计数据（适配年月切换）
     function renderStatistics() {
-      const now = new Date();
+      const nowDate = new Date();
       // 今日时间范围
-      const todayStart = new Date(now.toLocaleDateString()).getTime();
+      const todayStart = new Date(nowDate.toLocaleDateString()).getTime();
       const todayEnd = todayStart + 24 * 60 * 60 * 1000 - 1;
-      // 本月时间范围
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+      // 当前选择的月份时间范围
+      const selectedMonthStart = new Date(currentYear, currentMonth - 1, 1).getTime();
+      const selectedMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59).getTime();
       
       let totalIncome = 0;
       let totalExpense = 0;
       let todayIncome = 0;
       let todayExpense = 0;
-      let monthIncome = 0;
-      let monthExpense = 0;
+      let selectedMonthIncome = 0;
+      let selectedMonthExpense = 0;
       
       records.forEach(record => {
+        // 计算总收支（结余用）
         if (record.type === 'income') {
           totalIncome += record.amount;
-          if (record.timestamp >= todayStart && record.timestamp <= todayEnd) {
-            todayIncome += record.amount;
-          }
-          if (record.timestamp >= monthStart && record.timestamp <= monthEnd) {
-            monthIncome += record.amount;
-          }
         } else {
           totalExpense += record.amount;
-          if (record.timestamp >= todayStart && record.timestamp <= todayEnd) {
+        }
+        // 计算今日收支
+        if (record.timestamp >= todayStart && record.timestamp <= todayEnd) {
+          if (record.type === 'income') {
+            todayIncome += record.amount;
+          } else {
             todayExpense += record.amount;
           }
-          if (record.timestamp >= monthStart && record.timestamp <= monthEnd) {
-            monthExpense += record.amount;
+        }
+        // 计算选中月份的收支
+        if (record.timestamp >= selectedMonthStart && record.timestamp <= selectedMonthEnd) {
+          if (record.type === 'income') {
+            selectedMonthIncome += record.amount;
+          } else {
+            selectedMonthExpense += record.amount;
           }
         }
       });
@@ -669,14 +767,31 @@
       
       todayIncomeEl.textContent = `+${formatAmount(todayIncome)}`;
       todayExpenseEl.textContent = `-${formatAmount(todayExpense)}`;
-      monthIncomeEl.textContent = `+${formatAmount(monthIncome)}`;
-      monthExpenseEl.textContent = `-${formatAmount(monthExpense)}`;
+      monthIncomeEl.textContent = `+${formatAmount(selectedMonthIncome)}`;
+      monthExpenseEl.textContent = `-${formatAmount(selectedMonthExpense)}`;
     }
 
-    // 渲染记录列表
+    // 渲染记录列表（适配年月筛选）
     function renderRecords() {
-      if (records.length === 0) {
+      // 筛选当前选择年月的记录
+      const selectedMonthStart = new Date(currentYear, currentMonth - 1, 1).getTime();
+      const selectedMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59).getTime();
+      
+      const filteredRecords = records.filter(record => {
+        return record.timestamp >= selectedMonthStart && record.timestamp <= selectedMonthEnd;
+      });
+      
+      // 空状态处理
+      if (filteredRecords.length === 0) {
         emptyState.classList.remove('hidden');
+        // 动态显示空状态提示
+        if (records.length === 0) {
+          emptyState.querySelector('p:first-of-type').textContent = '还没有记账记录哦';
+          emptyState.querySelector('p:last-of-type').textContent = '点击右下角+号开始记账吧';
+        } else {
+          emptyState.querySelector('p:first-of-type').textContent = `${currentYear}年${currentMonth}月暂无记录`;
+          emptyState.querySelector('p:last-of-type').textContent = '切换其他月份或新增记录吧';
+        }
         recordList.innerHTML = '';
         recordList.appendChild(emptyState);
         return;
@@ -685,7 +800,7 @@
       emptyState.classList.add('hidden');
       recordList.innerHTML = '';
       
-      records.forEach(record => {
+      filteredRecords.forEach(record => {
         const recordEl = document.createElement('div');
         recordEl.id = `record-${record.id}`;
         recordEl.className = 'record-item flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 animate-fade-in';
@@ -766,6 +881,12 @@
       
       // 保存按钮
       saveBtn.addEventListener('click', saveRecord);
+
+      // 新增：年月切换事件
+      prevMonthBtn.addEventListener('click', prevMonth);
+      nextMonthBtn.addEventListener('click', nextMonth);
+      currentMonthText.addEventListener('click', () => monthPicker.showPicker?.() || monthPicker.click());
+      monthPicker.addEventListener('change', changeMonthFromPicker);
     }
 
     // 启动应用
